@@ -29,7 +29,7 @@ type ReportIssue struct {
 }
 
 type Report struct {
-	Issues []ReportIssue `json:"issues" xml:"issues"`
+	Issues  []ReportIssue `json:"issues" xml:"issues"`
 	Summary struct {
 		Total    int `json:"total" xml:"total"`
 		Errors   int `json:"errors" xml:"errors"`
@@ -40,7 +40,7 @@ type Report struct {
 
 func NewReporter(cfg *config.Config) Reporter {
 	var writer io.Writer = os.Stdout
-	
+
 	if cfg.OutputPath != "" {
 		file, err := os.Create(cfg.OutputPath)
 		if err != nil {
@@ -81,7 +81,7 @@ func (r *TextReporter) Report(issues []analyzer.Issue, pass *analysis.Pass) erro
 	for _, issue := range sortedIssues {
 		pos := pass.Fset.Position(issue.Diagnostic.Pos)
 		severityLabel := getSeverityLabel(issue.Severity)
-		
+
 		fmt.Fprintf(r.writer, "%s:%d:%d: [%s][%s] %s\n",
 			pos.Filename,
 			pos.Line,
@@ -101,10 +101,15 @@ type JSONReporter struct {
 
 func (r *JSONReporter) Report(issues []analyzer.Issue, pass *analysis.Pass) error {
 	report := buildReport(issues, pass)
-	
+
 	encoder := json.NewEncoder(r.writer)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(report)
+
+	if err := encoder.Encode(report); err != nil {
+		return fmt.Errorf("failed to encode report to JSON: %w", err)
+	}
+
+	return nil
 }
 
 type XMLReporter struct {
@@ -113,15 +118,19 @@ type XMLReporter struct {
 
 func (r *XMLReporter) Report(issues []analyzer.Issue, pass *analysis.Pass) error {
 	report := buildReport(issues, pass)
-	
+
 	encoder := xml.NewEncoder(r.writer)
 	encoder.Indent("", "  ")
-	
+
 	if _, err := r.writer.Write([]byte(xml.Header)); err != nil {
-		return err
+		return fmt.Errorf("unable to write file: %w", err)
 	}
-	
-	return encoder.Encode(report)
+
+	if err := encoder.Encode(report); err != nil {
+		return fmt.Errorf("failed to encode report to XML: %w", err)
+	}
+
+	return nil
 }
 
 type HTMLReporter struct {
@@ -183,13 +192,17 @@ const htmlTemplate = `<!DOCTYPE html>
 
 func (r *HTMLReporter) Report(issues []analyzer.Issue, pass *analysis.Pass) error {
 	report := buildReport(issues, pass)
-	
+
 	tmpl, err := template.New("report").Parse(htmlTemplate)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable parse html template: %w", err)
 	}
-	
-	return tmpl.Execute(r.writer, report)
+
+	if err := tmpl.Execute(r.writer, report); err != nil {
+		return fmt.Errorf("unable to execute html template: %w", err)
+	}
+
+	return nil
 }
 
 func buildReport(issues []analyzer.Issue, pass *analysis.Pass) *Report {
@@ -199,7 +212,7 @@ func buildReport(issues []analyzer.Issue, pass *analysis.Pass) *Report {
 
 	for _, issue := range issues {
 		pos := pass.Fset.Position(issue.Diagnostic.Pos)
-		
+
 		reportIssue := ReportIssue{
 			File:     filepath.Clean(pos.Filename),
 			Line:     pos.Line,
@@ -208,9 +221,9 @@ func buildReport(issues []analyzer.Issue, pass *analysis.Pass) *Report {
 			Severity: string(issue.Severity),
 			Message:  issue.Diagnostic.Message,
 		}
-		
+
 		report.Issues = append(report.Issues, reportIssue)
-		
+
 		switch issue.Severity {
 		case config.SeverityError:
 			report.Summary.Errors++
@@ -220,16 +233,16 @@ func buildReport(issues []analyzer.Issue, pass *analysis.Pass) *Report {
 			report.Summary.Info++
 		}
 	}
-	
+
 	report.Summary.Total = len(issues)
-	
+
 	sort.Slice(report.Issues, func(i, j int) bool {
 		if report.Issues[i].File != report.Issues[j].File {
 			return report.Issues[i].File < report.Issues[j].File
 		}
 		return report.Issues[i].Line < report.Issues[j].Line
 	})
-	
+
 	return report
 }
 

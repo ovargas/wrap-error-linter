@@ -93,6 +93,7 @@ var DefaultConfig = Config{
 	Exclude: ExcludeConfig{
 		Files:           []string{"*_test.go", "generated_*.go", "*.pb.go"},
 		AllowDirectives: true,
+		Packages:        []string{"**/mocks/*", "**/mocks"},
 	},
 	IgnorePackages: []string{
 		"io",
