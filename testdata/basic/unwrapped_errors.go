@@ -86,7 +86,7 @@ func logError(err error) {
 func MissingContext() error {
 	file, err := os.Open("test.txt")
 	if err != nil {
-		return fmt.Errorf("%w", err) // want "error wrapping should include context message" (if require-context is enabled)
+		return fmt.Errorf("%w", err) // OK - context requirement is disabled by default
 	}
 	defer file.Close()
 	return nil

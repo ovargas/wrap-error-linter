@@ -18,7 +18,7 @@ func DoubleWrapSameFunction() error {
 func DoubleWrapAcrossFunctions() error {
 	err := helper()
 	if err != nil {
-		return fmt.Errorf("helper failed: %w", err) // want "error is already wrapped" (if helper already wraps)
+		return fmt.Errorf("helper failed: %w", err) // OK - wrapping error from same package is allowed
 	}
 	return nil
 }

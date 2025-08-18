@@ -99,9 +99,9 @@ context-patterns:
 custom-wrappers:
   packages:
     - package: "github.com/pkg/errors"
-      functions: ["Wrap", "Wrapf", "WithStack", "WithMessage"]
+      functions: [ "Wrap", "Wrapf", "WithStack", "WithMessage" ]
     - package: "github.com/mycompany/errors"
-      functions: ["WrapContext"]
+      functions: [ "WrapContext" ]
   auto-detect-unwrap: true
 
 # Severity levels for each rule
@@ -134,19 +134,19 @@ trusted-packages:
 
 ## Command Line Flags
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `-config` | Path to configuration file | Auto-detect |
-| `-mode` | Mode: warn or fail | warn |
-| `-output` | Output format: text, json, xml, html | text |
-| `-output-path` | Path to output file | stdout |
-| `-require-context` | Require context message when wrapping | false |
-| `-max-wrap-depth` | Maximum wrapping depth | 10 |
-| `-ignore-packages` | Comma-separated packages to ignore | |
-| `-trusted-packages` | Comma-separated trusted packages | |
-| `-exclude-files` | Comma-separated file patterns to exclude | |
-| `-exclude-packages` | Comma-separated packages to exclude | |
-| `-version` | Show version information | |
+| Flag                | Description                              | Default     |
+|---------------------|------------------------------------------|-------------|
+| `-config`           | Path to configuration file               | Auto-detect |
+| `-mode`             | Mode: warn or fail                       | warn        |
+| `-output`           | Output format: text, json, xml, html     | text        |
+| `-output-path`      | Path to output file                      | stdout      |
+| `-require-context`  | Require context message when wrapping    | false       |
+| `-max-wrap-depth`   | Maximum wrapping depth                   | 10          |
+| `-ignore-packages`  | Comma-separated packages to ignore       |             |
+| `-trusted-packages` | Comma-separated trusted packages         |             |
+| `-exclude-files`    | Comma-separated file patterns to exclude |             |
+| `-exclude-packages` | Comma-separated packages to exclude      |             |
+| `-version`          | Show version information                 |             |
 
 ## Rules
 
@@ -158,13 +158,13 @@ Errors from external packages must be wrapped with context:
 // Bad
 file, err := os.Open("config.yml")
 if err != nil {
-    return err // Error: should be wrapped
+return err // Error: should be wrapped
 }
 
 // Good
 file, err := os.Open("config.yml")
 if err != nil {
-    return fmt.Errorf("failed to open config: %w", err)
+return fmt.Errorf("failed to open config: %w", err)
 }
 ```
 
@@ -233,7 +233,7 @@ The linter supports custom error wrapping functions:
 custom-wrappers:
   packages:
     - package: "github.com/mycompany/errors"
-      functions: ["Wrap", "WrapWithContext"]
+      functions: [ "Wrap", "WrapWithContext" ]
 ```
 
 It also auto-detects types implementing the `Unwrap() error` method.
@@ -256,7 +256,7 @@ exclude:
 ```go
 //nolint:wrap-error
 func SomeFunction() error {
-    return externalErr // This line won't be flagged
+return externalErr // This line won't be flagged
 }
 ```
 
@@ -346,4 +346,5 @@ MIT License - see LICENSE file for details
 
 ## Support
 
-For issues and feature requests, please use the [GitHub issue tracker](https://github.com/ovargas/wrap-error-linter/issues).
+For issues and feature requests, please use
+the [GitHub issue tracker](https://github.com/ovargas/wrap-error-linter/issues).

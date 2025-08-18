@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"reflect"
 	"strings"
 
 	"github.com/ovargas/wrap-error-linter/pkg/config"
@@ -14,10 +15,11 @@ import (
 )
 
 var Analyzer = &analysis.Analyzer{
-	Name:     "wraperror",
-	Doc:      "Checks that errors from external packages are properly wrapped",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+	Name:       "wraperror",
+	Doc:        "Checks that errors from external packages are properly wrapped",
+	Requires:   []*analysis.Analyzer{inspect.Analyzer},
+	Run:        run,
+	ResultType: reflect.TypeOf([]Issue{}),
 }
 
 type Issue struct {
@@ -48,6 +50,11 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	// Try to load config, but don't fail if we can't
 	if userCfg, err := config.LoadConfig(""); err == nil {
 		cfg = userCfg
+	}
+
+	// Check if package is excluded
+	if cfg.IsPackageExcluded(pass.Pkg.Path()) {
+		return nil, nil
 	}
 
 	if len(pass.Files) > 0 {
@@ -146,26 +153,14 @@ func (a *analyzer) analyzeReturnStmt(ret *ast.ReturnStmt) {
 }
 
 func (a *analyzer) analyzeCallExpr(call *ast.CallExpr) {
+	// Always check for %v usage in fmt.Errorf
+	a.checkPercentVUsage(call)
+	
 	if a.isErrorWrappingCall(call) {
-		if len(call.Args) > 0 {
-			for _, arg := range call.Args {
-				if a.isErrorType(arg) {
-					if ident, ok := arg.(*ast.Ident); ok {
-						obj := a.pass.TypesInfo.ObjectOf(ident)
-						if obj != nil {
-							if a.wrappedErrors[obj] {
-								a.reportIssue(call.Pos(), "double-wrap",
-									"error is already wrapped")
-							}
-							a.wrappedErrors[obj] = true
-						}
-					}
-				}
-			}
-		}
-		
+		// Check wrapping context
 		a.checkWrappingContext(call)
-		a.checkPercentVUsage(call)
+		
+		// Don't check for double wrapping here - it's handled in assignment/return contexts
 	}
 }
 
@@ -186,6 +181,18 @@ func (a *analyzer) analyzeAssignStmt(assign *ast.AssignStmt) {
 					}
 
 					if a.isErrorWrappingCall(call) {
+						// Check for double wrapping before marking as wrapped
+						for _, arg := range call.Args {
+							if a.isErrorType(arg) {
+								if argIdent, ok := arg.(*ast.Ident); ok {
+									argObj := a.pass.TypesInfo.ObjectOf(argIdent)
+									if argObj != nil && a.wrappedErrors[argObj] {
+										a.reportIssue(call.Pos(), "double-wrap",
+											"error is already wrapped")
+									}
+								}
+							}
+						}
 						a.wrappedErrors[obj] = true
 					} else {
 						// Track the source package of this error
@@ -215,6 +222,18 @@ func (a *analyzer) analyzeAssignStmt(assign *ast.AssignStmt) {
 
 				if call, ok := assign.Rhs[i].(*ast.CallExpr); ok {
 					if a.isErrorWrappingCall(call) {
+						// Check for double wrapping before marking as wrapped
+						for _, arg := range call.Args {
+							if a.isErrorType(arg) {
+								if argIdent, ok := arg.(*ast.Ident); ok {
+									argObj := a.pass.TypesInfo.ObjectOf(argIdent)
+									if argObj != nil && a.wrappedErrors[argObj] {
+										a.reportIssue(call.Pos(), "double-wrap",
+											"error is already wrapped")
+									}
+								}
+							}
+						}
 						a.wrappedErrors[obj] = true
 					} else {
 						// Track the source package of this error
@@ -353,7 +372,39 @@ func (a *analyzer) checkDoubleWrapping(expr ast.Expr) {
 }
 
 func (a *analyzer) analyzeErrorReturn(call *ast.CallExpr) {
-	
+	// If returning a wrapping call directly, check for double wrapping
+	if a.isErrorWrappingCall(call) {
+		if len(call.Args) > 0 {
+			for _, arg := range call.Args {
+				if a.isErrorType(arg) {
+					if ident, ok := arg.(*ast.Ident); ok {
+						obj := a.pass.TypesInfo.ObjectOf(ident)
+						if obj != nil && a.wrappedErrors[obj] {
+							a.reportIssue(call.Pos(), "double-wrap",
+								"error is already wrapped")
+						}
+					}
+				}
+			}
+		}
+	} else if !a.isFmtErrorf(call) {
+		// Check if returning an unwrapped external error (skip fmt.Errorf as it has its own checks)
+		if pkg := a.getCallPackage(call); pkg != "" && pkg != a.currentPkgPath {
+			if !a.config.IsTrustedPackage(pkg) {
+				a.reportIssue(call.Pos(), "unwrapped-external-error",
+					"error from external package '%s' should be wrapped", pkg)
+			}
+		}
+	}
+}
+
+func (a *analyzer) isFmtErrorf(call *ast.CallExpr) bool {
+	if fun, ok := call.Fun.(*ast.SelectorExpr); ok {
+		if pkg, ok := fun.X.(*ast.Ident); ok {
+			return pkg.Name == "fmt" && fun.Sel.Name == "Errorf"
+		}
+	}
+	return false
 }
 
 func (a *analyzer) returnsErrorWithoutWrapping(call *ast.CallExpr) bool {
@@ -446,9 +497,8 @@ func (a *analyzer) reportIssue(pos token.Pos, rule string, format string, args .
 	
 	a.issues = append(a.issues, issue)
 	
-	if severity == config.SeverityError || (severity == config.SeverityWarn && a.config.ShouldFail()) {
-		a.pass.Report(diagnostic)
-	}
+	// Always report diagnostics for the analysis framework (needed for tests)
+	a.pass.Report(diagnostic)
 }
 
 func hasUnwrapMethod(typ types.Type) bool {

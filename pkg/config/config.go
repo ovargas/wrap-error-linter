@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,24 +18,24 @@ const (
 )
 
 type Config struct {
-	Mode                  string                    `yaml:"mode"`
-	Output                string                    `yaml:"output"`
-	OutputPath            string                    `yaml:"output-path"`
-	IgnorePackages        []string                  `yaml:"ignore-packages"`
-	IgnoreSentinelErrors  bool                      `yaml:"ignore-sentinel-errors"`
-	MaxWrapDepth          int                       `yaml:"max-wrap-depth"`
-	RequireContext        bool                      `yaml:"require-context"`
-	ContextMinLength      int                       `yaml:"context-min-length"`
-	ContextPatterns       []string                  `yaml:"context-patterns"`
-	CustomWrappers        CustomWrappers            `yaml:"custom-wrappers"`
-	Severity              map[string]Severity       `yaml:"severity"`
-	Exclude               ExcludeConfig             `yaml:"exclude"`
-	TrustedPackages       []string                  `yaml:"trusted-packages"`
+	Mode                 string              `yaml:"mode"`
+	Output               string              `yaml:"output"`
+	OutputPath           string              `yaml:"output-path"`
+	IgnorePackages       []string            `yaml:"ignore-packages"`
+	IgnoreSentinelErrors bool                `yaml:"ignore-sentinel-errors"`
+	MaxWrapDepth         int                 `yaml:"max-wrap-depth"`
+	RequireContext       bool                `yaml:"require-context"`
+	ContextMinLength     int                 `yaml:"context-min-length"`
+	ContextPatterns      []string            `yaml:"context-patterns"`
+	CustomWrappers       CustomWrappers      `yaml:"custom-wrappers"`
+	Severity             map[string]Severity `yaml:"severity"`
+	Exclude              ExcludeConfig       `yaml:"exclude"`
+	TrustedPackages      []string            `yaml:"trusted-packages"`
 }
 
 type CustomWrappers struct {
-	Packages []PackageWrapper `yaml:"packages"`
-	AutoDetectUnwrap bool        `yaml:"auto-detect-unwrap"`
+	Packages         []PackageWrapper `yaml:"packages"`
+	AutoDetectUnwrap bool             `yaml:"auto-detect-unwrap"`
 }
 
 type PackageWrapper struct {
@@ -43,9 +44,9 @@ type PackageWrapper struct {
 }
 
 type ExcludeConfig struct {
-	Files          []string `yaml:"files"`
-	Functions      []string `yaml:"functions"`
-	Packages       []string `yaml:"packages"`
+	Files           []string `yaml:"files"`
+	Functions       []string `yaml:"functions"`
+	Packages        []string `yaml:"packages"`
 	AllowDirectives bool     `yaml:"allow-directives"`
 }
 
@@ -165,9 +166,48 @@ func (c *Config) IsExcluded(filename string) bool {
 }
 
 func (c *Config) IsPackageExcluded(pkg string) bool {
-	for _, excluded := range c.Exclude.Packages {
-		if pkg == excluded {
+	for _, pattern := range c.Exclude.Packages {
+		// Support exact match
+		if pkg == pattern {
 			return true
+		}
+
+		// Support glob patterns with ** (matches any number of directories)
+		if strings.Contains(pattern, "**") {
+			// Handle patterns like "**/mocks/*" or "**/testdata"
+			if strings.HasPrefix(pattern, "**/") {
+				suffix := pattern[3:] // Remove the "**/" prefix
+
+				// If pattern is "**/mocks/*", check if pkg contains "/mocks/"
+				if strings.HasSuffix(suffix, "/*") {
+					component := suffix[:len(suffix)-2] // Remove "/*"
+					if strings.Contains(pkg, "/"+component+"/") {
+						return true
+					}
+				} else {
+					// If pattern is "**/mocks", only match if pkg ends with "/mocks"
+					if strings.HasSuffix(pkg, "/"+suffix) {
+						return true
+					}
+				}
+			}
+		}
+
+		// Support standard glob patterns
+		if strings.Contains(pattern, "*") {
+			matched, _ := filepath.Match(pattern, pkg)
+			if matched {
+				return true
+			}
+
+			// Also try matching against the last part of the package path
+			parts := strings.Split(pkg, "/")
+			if len(parts) > 0 {
+				matched, _ = filepath.Match(pattern, parts[len(parts)-1])
+				if matched {
+					return true
+				}
+			}
 		}
 	}
 	return false
