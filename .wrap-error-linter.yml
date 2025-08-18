@@ -1,0 +1,49 @@
+# Wrap Error Linter Configuration
+
+# Mode: warn or fail
+mode: warn
+
+# Output format: text, json, xml, html
+output: text
+
+# Packages to ignore for wrapping requirement
+ignore-packages:
+  - io
+  - database/sql
+
+# Ignore sentinel errors
+ignore-sentinel-errors: true
+
+# Maximum wrapping depth
+max-wrap-depth: 10
+
+# Require contextual message when wrapping
+require-context: false
+
+# Minimum length for context message
+context-min-length: 10
+
+# Custom wrapper functions
+custom-wrappers:
+  packages:
+    - package: "github.com/pkg/errors"
+      functions: ["Wrap", "Wrapf", "WithStack", "WithMessage"]
+  auto-detect-unwrap: true
+
+# Severity levels for each rule
+severity:
+  unwrapped-external-error: warn
+  double-wrap: warn
+  missing-context: warn
+  using-percent-v: warn
+  max-depth-exceeded: warn
+
+# Exclusions
+exclude:
+  files:
+    - "*_test.go"
+    - "*.pb.go"
+  allow-directives: true
+
+# Trusted internal packages
+trusted-packages: []

@@ -1,0 +1,36 @@
+linters-settings:
+  custom:
+    wrap-error:
+      type: "module"
+      description: "Checks that errors from external packages are properly wrapped"
+      original-url: "github.com/ovargas/wrap-error-linter"
+      settings:
+        mode: "fail"
+        output: "text"
+        ignore-sentinel-errors: true
+        max-wrap-depth: 10
+        require-context: true
+        context-min-length: 10
+        trusted-packages:
+          - "github.com/mycompany/internal"
+        exclude:
+          files:
+            - "*_test.go"
+            - "*.pb.go"
+          packages:
+            - "generated"
+          allow-directives: true
+
+linters:
+  enable:
+    - wrap-error
+  disable-all: false
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - wrap-error
+    - path: generated/
+      linters:
+        - wrap-error
