@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 
 	"github.com/ovargas/wrap-error-linter/pkg/analyzer"
 	"github.com/ovargas/wrap-error-linter/pkg/config"
@@ -103,6 +104,28 @@ func runCustomMode() {
 				hasErrors = true
 			}
 		}
+	}
+
+	// Sort issues by file and line
+	if len(pkgs) > 0 && pkgs[0].Fset != nil {
+		fset := pkgs[0].Fset
+		sort.Slice(allIssues, func(i, j int) bool {
+			posI := fset.Position(allIssues[i].Diagnostic.Pos)
+			posJ := fset.Position(allIssues[j].Diagnostic.Pos)
+			
+			// First sort by filename
+			if posI.Filename != posJ.Filename {
+				return posI.Filename < posJ.Filename
+			}
+			
+			// Then by line number
+			if posI.Line != posJ.Line {
+				return posI.Line < posJ.Line
+			}
+			
+			// Finally by column
+			return posI.Column < posJ.Column
+		})
 	}
 
 	// Report issues

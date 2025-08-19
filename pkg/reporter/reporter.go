@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/ovargas/wrap-error-linter/pkg/analyzer"
 	"github.com/ovargas/wrap-error-linter/pkg/config"
@@ -72,13 +71,7 @@ func (r *TextReporter) Report(issues []analyzer.Issue, pass *analysis.Pass) erro
 		return nil
 	}
 
-	sortedIssues := make([]analyzer.Issue, len(issues))
-	copy(sortedIssues, issues)
-	sort.Slice(sortedIssues, func(i, j int) bool {
-		return sortedIssues[i].Diagnostic.Pos < sortedIssues[j].Diagnostic.Pos
-	})
-
-	for _, issue := range sortedIssues {
+	for _, issue := range issues {
 		pos := pass.Fset.Position(issue.Diagnostic.Pos)
 		severityLabel := getSeverityLabel(issue.Severity)
 
@@ -235,13 +228,6 @@ func buildReport(issues []analyzer.Issue, pass *analysis.Pass) *Report {
 	}
 
 	report.Summary.Total = len(issues)
-
-	sort.Slice(report.Issues, func(i, j int) bool {
-		if report.Issues[i].File != report.Issues[j].File {
-			return report.Issues[i].File < report.Issues[j].File
-		}
-		return report.Issues[i].Line < report.Issues[j].Line
-	})
 
 	return report
 }
